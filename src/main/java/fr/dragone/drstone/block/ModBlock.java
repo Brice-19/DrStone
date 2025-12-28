@@ -24,4 +24,14 @@ public class ModBlock {
                             .requiresCorrectToolForDrops()
             )
     );
+    public static final RegistryObject<Block> ARCHET = BLOCKS.register(
+            "archet",
+            () -> new ArchetBlock(
+                    BlockBehaviour.Properties.of()
+                            .mapColor(MapColor.WOOD)
+                            .strength(2.5F)
+                            .noOcclusion()
+            )
+    );
+
 }

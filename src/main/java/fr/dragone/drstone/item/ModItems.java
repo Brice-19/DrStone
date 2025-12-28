@@ -13,10 +13,17 @@ public class ModItems {
     public static final DeferredRegister<Item> ITEMS =
             DeferredRegister.create(ForgeRegistries.ITEMS, DrStone.MODID);
 
+    // 🧱 BlockItem : Pierre
     public static final RegistryObject<Item> PIERRE =
             ITEMS.register("pierre",
                     () -> new BlockItem(ModBlock.PIERRE.get(), new Item.Properties()));
 
+    public static final RegistryObject<Item> ARCHET_ITEM = ITEMS.register(
+            "archet",
+            () -> new BlockItem(ModBlock.ARCHET.get(), new Item.Properties())
+    );
+
+    // 📦 Item simple : Calliou
     public static final RegistryObject<Item> CALLIOU =
             ITEMS.register("calliou",
                     () -> new Item(new Item.Properties()));
