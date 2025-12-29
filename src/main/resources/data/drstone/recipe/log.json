@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "I": {
+      "tag": "minecraft:logs"
+    }
+  },
+  "pattern": [
+    "III"
+  ],
+  "result": {
+    "count": 9,
+    "id": "drstone:bois"
+  }
+}
