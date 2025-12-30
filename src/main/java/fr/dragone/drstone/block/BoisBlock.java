@@ -1,14 +1,20 @@
 package fr.dragone.drstone.block;
 
 import fr.dragone.drstone.item.ModItems;
+import fr.dragone.drstone.menu.CampfireMenu;
 import fr.dragone.drstone.util.FireScheduler;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.particles.ParticleTypes;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.InteractionHand;
-import net.minecraft.world.InteractionResult;
+import net.minecraft.world.ItemInteractionResult;
+import net.minecraft.world.MenuProvider;
+import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
@@ -48,64 +54,77 @@ public class BoisBlock extends Block {
         builder.add(STAGE, FROM_ARCHET);
     }
 
-    /* ===================== INTERACTIONS ===================== */
-
+    /* =====================================================
+       🔥 INTERACTION AVEC ITEM (Forge 1.21)
+       ===================================================== */
     @Override
-    protected InteractionResult useWithoutItem(
+    public ItemInteractionResult useItemOn(
+            ItemStack stack,
             BlockState state,
             Level level,
             BlockPos pos,
             Player player,
+            InteractionHand hand,
             BlockHitResult hit
     ) {
-        if (level.isClientSide) return InteractionResult.SUCCESS;
-
-        ItemStack held = player.getMainHandItem();
-        int stage = state.getValue(STAGE);
-
-        // Ajouter du bois
-        if (held.is(ModItems.BOIS.get()) && stage < 3) {
-            consume(player, held);
-            level.setBlock(pos, state.setValue(STAGE, stage + 1), 3);
-            return InteractionResult.CONSUME;
+        // ⚠️ le client doit juste ACK, JAMAIS ouvrir un menu
+        if (level.isClientSide) {
+            return ItemInteractionResult.SUCCESS;
         }
 
-        // Charbon / charbon de bois
-        if ((held.is(Items.CHARCOAL) || held.is(Items.COAL)) && stage == 3) {
+        int stage = state.getValue(STAGE);
+
+        /* =========================
+           🪵 AJOUT DE BOIS
+           ========================= */
+        if (stack.is(ModItems.BOIS.get()) && stage < 3) {
+            consume(player, stack);
+            level.setBlock(pos, state.setValue(STAGE, stage + 1), 3);
+            return ItemInteractionResult.CONSUME;
+        }
+
+        /* =========================
+           🔥 ALLUMAGE AU CHARBON
+           ========================= */
+        if ((stack.is(Items.CHARCOAL) || stack.is(Items.COAL)) && stage == 3) {
 
             boolean fromArchet = state.getValue(FROM_ARCHET);
-            consume(player, held);
+            consume(player, stack);
 
             BlockState campfire = Blocks.CAMPFIRE.defaultBlockState()
                     .setValue(CampfireBlock.LIT, fromArchet);
 
             level.setBlock(pos, campfire, 3);
 
-// 🔥 feu temporaire UNIQUEMENT si bois issu de l’archet
             if (fromArchet) {
                 FireScheduler.schedule(level, pos);
+            }
 
+            if (level instanceof ServerLevel serverLevel) {
+                player.openMenu(new MenuProvider() {
+                    @Override
+                    public net.minecraft.network.chat.Component getDisplayName() {
+                        return net.minecraft.network.chat.Component.literal("Feu de camp");
+                    }
+
+                    @Override
+                    public AbstractContainerMenu createMenu(int id, Inventory inv, Player p) {
+                        return new CampfireMenu(id, inv, serverLevel, pos);
+                    }
+                });
             }
 
 
-            return InteractionResult.CONSUME;
+            return ItemInteractionResult.CONSUME;
         }
 
-        // Retirer du bois à la main
-        if (held.isEmpty()) {
-
-            if (stage == 0) return InteractionResult.SUCCESS;
-
-            level.setBlock(pos, state.setValue(STAGE, stage - 1), 3);
-            popResource(level, pos, new ItemStack(ModItems.BOIS.get()));
-            return InteractionResult.CONSUME;
-        }
-
-        return InteractionResult.PASS;
+        // équivalent PASS en 1.21
+        return ItemInteractionResult.FAIL;
     }
 
-    /* ===================== DROPS ===================== */
-
+    /* =====================================================
+       📦 DROPS
+       ===================================================== */
     @Override
     public List<ItemStack> getDrops(BlockState state, LootParams.Builder builder) {
         List<ItemStack> drops = new ArrayList<>();
@@ -119,52 +138,30 @@ public class BoisBlock extends Block {
         if (!player.isCreative()) stack.shrink(1);
     }
 
-    /* ===================== PARTICULES 🔥 ===================== */
-
+    /* =====================================================
+       🔥 PARTICULES
+       ===================================================== */
     @Override
     public void animateTick(BlockState state, Level level, BlockPos pos, RandomSource random) {
-
         if (!state.getValue(FROM_ARCHET)) return;
 
         double x = pos.getX() + 0.5;
         double y = pos.getY() + 0.6;
         double z = pos.getZ() + 0.5;
 
-        level.addParticle(
-                ParticleTypes.FLAME,
-                x + (random.nextDouble() - 0.5) * 0.3,
-                y,
+        level.addParticle(ParticleTypes.FLAME,
+                x + (random.nextDouble() - 0.5) * 0.3, y,
                 z + (random.nextDouble() - 0.5) * 0.3,
-                0.0, 0.01, 0.0
-        );
+                0.0, 0.01, 0.0);
 
-        level.addParticle(
-                ParticleTypes.SMOKE,
-                x,
-                y + 0.1,
-                z,
-                0.0, 0.02, 0.0
-        );
+        level.addParticle(ParticleTypes.SMOKE,
+                x, y + 0.1, z,
+                0.0, 0.02, 0.0);
     }
 
-    /* ===================== FEU TEMPORAIRE ===================== */
-
-    @Override
-    public void tick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random) {
-
-        if (state.getBlock() instanceof CampfireBlock
-                && state.getValue(CampfireBlock.LIT)) {
-
-            level.setBlock(
-                    pos,
-                    state.setValue(CampfireBlock.LIT, false),
-                    3
-            );
-        }
-    }
-
-    /* ===================== EVENT : BOIS → ARCHET ===================== */
-
+    /* =====================================================
+       🏹 TRANSFORMATION EN ARCHET
+       ===================================================== */
     @Mod.EventBusSubscriber
     public static class BoisRightClickEvent {
 
@@ -196,7 +193,7 @@ public class BoisBlock extends Block {
                     );
                 }
 
-                event.setCancellationResult(InteractionResult.SUCCESS);
+                event.setCancellationResult(net.minecraft.world.InteractionResult.SUCCESS);
                 event.setCanceled(true);
             }
         }
