@@ -1,18 +1,16 @@
 {
   "type": "minecraft:crafting_shaped",
-  "category": "misc",
+  "category": "blocks",
   "key": {
     "I": {
       "item": "drstone:bois"
     }
   },
   "pattern": [
-    "III",
-    "III",
-    "III"
+    "I"
   ],
   "result": {
-    "count": 3,
-    "id": "minecraft:oak_log"
+    "count": 1,
+    "id": "minecraft:oak_planks"
   }
 }

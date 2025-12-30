@@ -3,7 +3,7 @@
     "stage=0": { "model": "drstone:block/archet_stage0" },
     "stage=1": { "model": "drstone:block/archet_stage1" },
     "stage=2": { "model": "drstone:block/archet_stage2" },
-    "stage=3": { "model": "drstone:block/archet_stage3" },
-    "stage=4": { "model": "drstone:block/archet_stage4" }
+    "stage=3": { "model": "drstone:block/archet_stage3" }
   }
 }
+

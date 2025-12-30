@@ -3,8 +3,8 @@
 	"credit": "Made with Blockbench",
 	"parent": "block/block",
 	"textures": {
-		"3": "campfire_log",
-		"particle": "textures/block/campfire_log"
+		"3": "drstone:block/campfire_log",
+		"particle": "drstone:block/campfire_log"
 	},
 	"elements": [
 		{
