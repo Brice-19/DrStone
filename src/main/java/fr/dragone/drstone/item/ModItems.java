@@ -18,13 +18,21 @@ public class ModItems {
             ITEMS.register("pierre",
                     () -> new BlockItem(ModBlock.PIERRE.get(), new Item.Properties()));
 
-    public static final RegistryObject<Item> ARCHET_ITEM = ITEMS.register(
-            "archet",
-            () -> new BlockItem(ModBlock.ARCHET.get(), new Item.Properties())
+    public static final RegistryObject<Item> BOIS = ITEMS.register(
+            "bois",
+            () -> new BlockItem(ModBlock.BOIS.get(), new Item.Properties())
     );
 
     // 📦 Item simple : Calliou
     public static final RegistryObject<Item> CALLIOU =
             ITEMS.register("calliou",
-                    () -> new Item(new Item.Properties()));
+                    () -> new Item(new Item.Properties())
+            );
+
+    public static final RegistryObject<Item> ARCHET =
+            ITEMS.register("archet",
+                    () -> new BlockItem(ModBlock.ARCHET.get(), new Item.Properties()));
+
+
+
 }

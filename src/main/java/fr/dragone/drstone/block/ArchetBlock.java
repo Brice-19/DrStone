@@ -1,100 +1,121 @@
-package fr.dragone.drstone.block.entity;
+package fr.dragone.drstone.block;
 
-import fr.dragone.drstone.block.ArchetBlock;
+import fr.dragone.drstone.item.ModItems;
+import fr.dragone.drstone.util.FireScheduler;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.HolderLookup;
 import net.minecraft.core.particles.ParticleTypes;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.StateDefinition;
+import net.minecraft.world.level.block.state.properties.IntegerProperty;
+import net.minecraftforge.event.entity.player.PlayerInteractEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
 
-public class ArchetBlockEntity extends BlockEntity {
+public class ArchetBlock extends Block {
 
-    private int burnTime = 20 * 4; // 4 secondes
-    private boolean holding = false;
+    public static final IntegerProperty STAGE = IntegerProperty.create("stage", 0, 2);
+    public static final IntegerProperty PROGRESS = IntegerProperty.create("progress", 0, 40);
 
-    public ArchetBlockEntity(BlockPos pos, BlockState state) {
-        super(ModBlockEntities.ARCHET.get(), pos, state);
+    public ArchetBlock(Properties properties) {
+        super(properties);
+        this.registerDefaultState(
+                this.stateDefinition.any()
+                        .setValue(STAGE, 0)
+                        .setValue(PROGRESS, 0)
+        );
     }
 
-    /* ================= FIRE ================= */
-
-    public void startFire() {
-        burnTime = 20 * 4;
-        setChanged();
-        sync();
+    @Override
+    protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
+        builder.add(STAGE, PROGRESS);
     }
 
-    public void setHolding(boolean value) {
-        this.holding = value;
-    }
+    @Mod.EventBusSubscriber
+    public static class ArchetEvent {
 
-    /* ================= TICK ================= */
+        @SubscribeEvent
+        public static void onRightClick(PlayerInteractEvent.RightClickBlock event) {
 
-    public static void tick(Level level, BlockPos pos, BlockState state, ArchetBlockEntity be) {
+            if (event.getHand() != InteractionHand.MAIN_HAND) return;
 
-        if (state.getValue(ArchetBlock.STAGE) != 3) return;
+            Level level = event.getLevel();
+            BlockPos pos = event.getPos();
+            BlockState state = level.getBlockState(pos);
+            Player player = event.getEntity();
+            ItemStack held = player.getItemInHand(event.getHand());
 
-        boolean isHolding = be.holding;
-        be.holding = false;
+            if (!(state.getBlock() instanceof ArchetBlock)) return;
 
-        // ❌ pas d’appui → rien
-        if (!isHolding) return;
+            int stage = state.getValue(STAGE);
+            int progress = state.getValue(PROGRESS);
 
-        // 💨 particules pendant l’appui (serveur → client)
-        if (!level.isClientSide) {
-            ((ServerLevel) level).sendParticles(
-                    ParticleTypes.SMOKE,
-                    pos.getX() + 0.5,
-                    pos.getY() + 0.3,
-                    pos.getZ() + 0.5,
-                    1,
-                    0, 0.02, 0,
-                    0.0
-            );
+            // Étape 1 : arc
+            if (stage == 0 && held.is(Items.BOW)) {
+                consume(player, held);
+                level.setBlock(pos, state.setValue(STAGE, 1), 3);
+                cancel(event);
+                return;
+            }
+
+            // Étape 2 : caillou
+            if (stage == 1 && held.is(ModItems.CALLIOU.get())) {
+                consume(player, held);
+                level.setBlock(pos, state.setValue(STAGE, 2).setValue(PROGRESS, 0), 3);
+                cancel(event);
+                return;
+            }
+
+            // Étape 3 : frottement main nue
+            if (stage == 2 && held.isEmpty() && level instanceof ServerLevel server) {
+
+                server.sendParticles(
+                        ParticleTypes.SMOKE,
+                        pos.getX() + 0.5,
+                        pos.getY() + 0.4,
+                        pos.getZ() + 0.5,
+                        2,
+                        0.02, 0.05, 0.02,
+                        0.0
+                );
+
+                int newProgress = progress + 1;
+
+                if (newProgress >= 40) {
+                    level.setBlock(
+                            pos,
+                            ModBlock.BOIS.get()
+                                    .defaultBlockState()
+                                    .setValue(BoisBlock.STAGE, 0)
+                                    .setValue(BoisBlock.FROM_ARCHET, true),
+                            3
+                    );
+
+                    // ✅ SEULE AJOUT : timer pour retirer FROM_ARCHET après 1 minute
+                    FireScheduler.schedule(level, pos);
+
+                } else {
+                    level.setBlock(pos, state.setValue(PROGRESS, newProgress), 3);
+                }
+
+                cancel(event);
+            }
         }
 
-        be.burnTime--;
-
-        // 🔥 feu terminé → STAGE 4
-        if (be.burnTime <= 0 && !level.isClientSide) {
-            level.setBlock(pos, state.setValue(ArchetBlock.STAGE, 4), 3);
-            be.sync();
+        private static void cancel(PlayerInteractEvent.RightClickBlock event) {
+            event.setCancellationResult(InteractionResult.SUCCESS);
+            event.setCanceled(true);
         }
-    }
 
-    /* ================= SAVE / LOAD ================= */
-
-    @Override
-    protected void saveAdditional(CompoundTag tag, HolderLookup.Provider provider) {
-        super.saveAdditional(tag, provider);
-        tag.putInt("BurnTime", burnTime);
-    }
-
-    @Override
-    protected void loadAdditional(CompoundTag tag, HolderLookup.Provider provider) {
-        super.loadAdditional(tag, provider);
-        burnTime = tag.getInt("BurnTime");
-    }
-
-    /* ================= SYNC ================= */
-
-    @Override
-    public ClientboundBlockEntityDataPacket getUpdatePacket() {
-        return ClientboundBlockEntityDataPacket.create(this);
-    }
-
-    @Override
-    public CompoundTag getUpdateTag(HolderLookup.Provider provider) {
-        return saveWithoutMetadata(provider);
-    }
-
-    private void sync() {
-        if (level != null && !level.isClientSide) {
-            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), 3);
+        private static void consume(Player player, ItemStack stack) {
+            if (!player.isCreative()) stack.shrink(1);
         }
     }
 }

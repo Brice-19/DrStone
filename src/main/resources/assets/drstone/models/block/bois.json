@@ -1,7 +1,7 @@
 {
 	"format_version": "1.21.6",
+	"parent": "minecraft:block/cube_all",
 	"credit": "Made with Blockbench",
-	"parent": "block/block",
 	"textures": {
 		"3": "drstone:block/campfire_log",
 		"particle": "drstone:block/campfire_log"
